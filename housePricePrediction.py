@@ -1,20 +1,38 @@
 import math
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
+from sklearn.preprocessing import StandardScaler
 
 # Use a nice plotting style
 plt.style.use('seaborn-v0_8-darkgrid')
 
 # Load the data set with more data points
-x_train = np.array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0])   # Features (house sizes)
-y_train = np.array([300.0, 500.0, 700.0, 900.0, 1100.0, 1300.0])  # Target values (house prices)
+df = pd.read_csv('C:/Users/User7/Desktop/CS/py/housePricePrediction/housing.csv')
+
+# Display the first few rows of the dataframe to verify it loaded correctly
+print(df.head())
+
+# Drop rows with missing values
+df = df.dropna()
+
+# Convert categorical variables to dummy variables
+df = pd.get_dummies(df, columns=['mainroad', 'guestroom', 'basement', 'hotwaterheating', 'airconditioning', 'prefarea', 'furnishingstatus'])
+
+# Separate features (X) and target (y)
+X = df.drop('price', axis=1)
+y = df['price']
+
+# Normalize the features (X)
+scaler = StandardScaler()
+X_norm = scaler.fit_transform(X)
 
 # Function to calculate the cost
 def compute_cost(x, y, w, b):
     m = x.shape[0]
     cost = 0
     for i in range(m):
-        f_wb = w * x[i] + b
+        f_wb = np.dot(w, x[i]) + b
         cost += (f_wb - y[i])**2
     total_cost = 1 / (2 * m) * cost
     return total_cost
@@ -22,11 +40,11 @@ def compute_cost(x, y, w, b):
 # Function to calculate the gradient
 def compute_gradient(x, y, w, b): 
     m = x.shape[0]
-    dj_dw = 0
+    dj_dw = np.zeros_like(w)
     dj_db = 0
     for i in range(m):
-        f_wb = w * x[i] + b 
-        dj_dw_i = (f_wb - y[i]) * x[i]
+        f_wb = np.dot(w, x[i]) + b 
+        dj_dw_i = np.dot((f_wb - y[i]), x[i])
         dj_db_i = f_wb - y[i]
         dj_db += dj_db_i
         dj_dw += dj_dw_i 
@@ -49,21 +67,23 @@ def gradient_descent(x, y, w_in, b_in, alpha, num_iters, cost_function, gradient
             p_history.append([w, b])
         if i % math.ceil(num_iters / 10) == 0:
             print(f"Iteration {i:4}: Cost {J_history[-1]:0.2e} ",
-                  f"dj_dw: {dj_dw: 0.3e}, dj_db: {dj_db: 0.3e}  ",
-                  f"w: {w: 0.3e}, b:{b: 0.5e}")
+                  f"dj_dw: {np.linalg.norm(dj_dw): 0.3e}, dj_db: {dj_db: 0.3e}  ",
+                  f"w: {w}, b:{b: 0.5e}")
     return w, b, J_history, p_history
 
 # Initialize parameters
-w_init = 0
+w_init = np.zeros(X_norm.shape[1])
 b_init = 0
+
 # Gradient descent settings
 iterations = 10000
 alpha = 1.0e-2
+
 # Run gradient descent
-w_final, b_final, J_hist, p_hist = gradient_descent(x_train, y_train, w_init, b_init, alpha, 
+w_final, b_final, J_hist, p_hist = gradient_descent(X_norm, y, w_init, b_init, alpha, 
                                                     iterations, compute_cost, compute_gradient)
 
-print(f"(w,b) found by gradient descent: ({w_final:8.4f},{b_final:8.4f})")
+print(f"(w,b) found by gradient descent: ({w_final}, {b_final})")
 
 # Plot cost versus iteration
 fig, (ax1, ax2) = plt.subplots(1, 2, constrained_layout=True, figsize=(12, 4))
@@ -75,11 +95,22 @@ ax1.set_xlabel('iteration step');  ax2.set_xlabel('iteration step')
 plt.show(block=False)
 
 # Function to predict house prices based on the trained model
-def predict_price(size, w, b):
-    return w * size + b
+def predict_price(features, w, b):
+    return np.dot(w, features) + b
 
 # Get user input for house size and predict its price
 house_size = float(input("Enter the size of the house: "))
 
-predicted_price = predict_price(house_size, w_final, b_final)
+# Extract the relevant features for the house size input
+house_features = df.drop('price', axis=1).iloc[0].copy()  # Use the first row as a template
+house_features['area'] = house_size  # Assume 'area' is the feature name for house size
+
+# Convert the single house features to a DataFrame to maintain feature names
+house_features_df = pd.DataFrame([house_features])
+
+# Normalize the house features
+house_features_norm = scaler.transform(house_features_df)  # Ensure it's a 2D array
+
+# Predict the price
+predicted_price = predict_price(house_features_norm.flatten(), w_final, b_final)
 print(f"The predicted price for a house of size {house_size} is: ${predicted_price:.2f}")
